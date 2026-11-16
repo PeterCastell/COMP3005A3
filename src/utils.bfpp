@@ -1,0 +1,465 @@
+
+
+# $0 = src to dist, $1 = dist to src
+&&move (
+    [- $0 + $1]
+    @$
+)
+
+# $0 = src to dist, $1 = dist to src
+&&move_2 (
+    [- $0 + $1] >
+    [- <$0> + <$1>] <
+    @$
+)
+
+# $0 = src to dist, $1 = dist to src
+&&move_4 (
+    [- $0 + $1] >
+    [- <$0> + <$1>] >
+    [- <<$0>> + <<$1>>] >
+    [- <3$0>3 + <3$1>3] <3
+    @$
+)
+
+# $0 = src to dist, $1 = dist to src
+&&move_8 (
+    [- $0 + $1] >
+    [- <$0> + <$1>] >
+    [- <<$0>> + <<$1>>] >
+    [- <3$0>3 + <3$1>3] >
+    [- <4$0>4 + <4$1>4] >
+    [- <5$0>5 + <5$1>5] >
+    [- <6$0>6 + <6$1>6] >
+    [- <7$0>7 + <7$1>7] <7
+    @$
+)
+
+# $0 = rep src, $1 = rep dest 
+&&move_ft (
+    $0(>)
+    $move ($$0(<) $$1(>)) ($$1(<) $$0(>))
+    $0(<)
+    @$
+)
+# $0 = rep src, $1 = rep dest, $2 = custom
+&&move_ft_custom (
+    $0(>)
+    [- $$0(<) $$1(>) $$2 $$1(<) $$0(>)]
+    $0(<)
+    @$
+)
+
+# $0 = rep src, $1 = rep dest 
+&&move_2_ft (
+    $0(>)    
+    $move_2 ($$0(<) $$1(>)) ($$1(<) $$0(>))
+    $0(<)
+    @$
+)
+
+# $0 = rep src, $1 = rep dest
+&&move_8_ft (
+    $0(>)
+    $move_8 ($$0(<) $$1(>)) ($$1(<) $$0(>))
+    $0(<)
+    @$
+)
+
+# $0 = rep src, $1 = rep dest, $2 = rep temp
+&&copy_ft (
+    $0(>)
+    $move_two ($$0(<) $$1(>)) ($$1(<) $$2(>)) ($$2(<) $$0(>))
+    $0(<)
+    $2(>)
+    $move ($$2(<) $$0(>)) ($$0(<) $$2(>))
+    $2(<)
+    @$
+)
+# $0 = rep src, $1 = rep dest, $2 = rep temp, $3 = custom
+&&copy_ft_custom (
+    $0(>)
+    [- $$0(<) $$1(>) $$3 $$1(<) $$2(>) + $$2(<) $$0(>)]
+    $0(<)
+    $2(>)
+    $move ($$2(<) $$0(>)) ($$0(<) $$2(>))
+    $2(<)
+    @$
+)
+
+# $0 = src to dest1, $1 = dest1 to dest2, $1 = dest2 to src
+&&move_two (
+    [- $0 + $1 + $2]
+)
+
+# $0 = src to dest1, $1 = dest1 to dest2, $1 = dest2 to src
+&&move_two_2 (
+    [- $0 + $1 + $2] >
+    [- <$0> + <$1> + <$2>] <
+)
+
+# $0 = src to dest1, $1 = dest1 to dest2, $1 = dest2 to src
+&&move_two_8 (
+    [- $0 + $1 + $2] >
+    [- <$0> + <$1> + <$2>] >
+    [- <<$0>> + <<$1>> + <<$2>>] >
+    [- <3$0>3 + <3$1>3 + <3$2>3] >
+    [- <4$0>4 + <4$1>4 + <4$2>4] >
+    [- <5$0>5 + <5$1>5 + <5$2>5] >
+    [- <6$0>6 + <6$1>6 + <6$2>6] >
+    [- <7$0>7 + <7$1>7 + <7$2>7] <7
+)
+
+# 0 = src to dest, 1 = dest to temp, 2 = temp to src, 3 = src to temp
+&&copy_2 (
+    $move_two_2($$0) ($$1) ($$2)
+    $3
+    $move_2($$2) ($$3)
+    $2
+)
+
+&&clear_8 (
+    {8 [-]> }
+    <8
+)
+&&clear_16 (
+    {16 [-]> }
+    <16
+)
+&&clear_4 (
+    {4 [-]> }
+    <4
+)
+
+&&clear_2 (
+    [-]>[-]<
+)
+
+# $0 = rep num cells to clear
+&&clear (
+    $0([-]>)
+    $0(<)
+)
+
+&&clear_nt (
+    [-]>[>]<[[-]<]
+)
+
+&&set_4_max (
+    +255 > +255 > +255 > +255
+    <3
+)
+
+&&print_nt (
+    [.>] < [<] >
+    @$
+)
+
+&&println_nt (
+    [.>] $println < [<] >
+    @$
+)
+
+&&println (
+    +10.-10
+)
+
+# 0 = target location, 1 = storage location
+&&ref_of_at (
+    $0(>) *
+    $move_8
+        ( $$0(<) $$1(>) )
+        ( $$1(<) $$0(>) )
+    $0(<)
+)
+
+# prints message and exits with code 1
+# 0 = message
+&&fail (
+    > $0
+    $println_nt
+    < + [ $! ]
+)
+
+# 0 = code to run if x is zero
+&&if_zero (
+    # |0  |1  |2  |
+    # |x  |f  |t  |
+
+    > + <
+    # clear f if x is non-zero
+    [ [- >> + <<] > - < ]
+    >> [- << + >>] <
+    [- < $0 > ]
+    <
+    @$
+)
+
+# reads a line as a null terminated string
+&&read_line (
+    ,
+    [
+        -10
+        # read next if not newline
+        [ +10 > , >> + < ]
+        > [- <] <
+    ]
+    <[<]>
+    @$
+)
+
+# r = a xor b, consumes a and b
+&&xor (
+    # |0  |1  |2  |3  |4  |5  |6  |7  |
+    # |a  |b  |r  |w  |h  |p  |t  |s  |
+
+    # set w
+    >3 + <3
+    {8
+        # a / 2 to h, a mod 2 to p
+        [ - >5 + <5
+            [ - >5 - < + <4
+                [- >6 + <6]
+            ]
+            >6 [- <6 + >6] <6
+        ]
+        >4 [- <4 + >4] <4
+        >5 [- >2 + <2] <5
+        # same for b
+        >
+        [ - >4 + <4
+            [ - >4 - < + <3
+                [- >5 + <5]
+            ]
+            >5 [- <5 + >5] <5
+        ]
+        >3 [- <3 + >3] <3
+        >4 [- >2 + <2] <4
+        <
+        # p = 1 if s is 1
+        >7
+        [ - <2 + >2
+            [ - <2 - >2 ]
+        ]
+        <2
+        # r += w
+        [ -
+            <2
+            [- < + >4 + <3]
+            >3 [- <3 + >3]
+            <
+        ]
+        # w *= 2
+        <2
+        [- >3 ++ <3]
+        >3 [- <3 + >3] <3
+        <3
+    }
+    @$
+)
+
+&&add_2 (
+    # |0  |1  |2  |3  |4  |5  |
+    # |1  |0  |dl |dh |sl |sh |
+    
+    + # set 1 cell
+
+    >5 # @src high
+    [- <2 + >2] # move to dest high
+    < # go to src low
+    [
+        # move
+        - <2 +
+        # carry
+        > + <
+        [> - <2]
+        < [>] >3
+        @$4
+    ]
+
+    <4 - # clear 1 cell
+    @$
+)
+
+# 0 = n, 1 = payload
+&add_1_n_core (
+    # |0  |1  |2  |3  |n   |n+1 |n+2|n+3|n+4  |
+    # |O0 |O1 |O2 |On |src |dest|0  |1  |carry|
+
+    &n($$0($$0))
+
+    # set 1
+    $n(>) >3 + <3 $n(<)
+
+    $1(
+        &&add (
+            $n(>)
+            [
+                # move
+                - > +
+                # carry
+                >3 + <3
+                [>3 - <2]
+                > [<] <2
+            ]
+            $n(<)
+            @$
+        )
+
+        &&add_no_carry (
+            $n(>) [ - > + <] $n(<)
+            @$
+        )
+
+        &&load_carry ($move_2_ft ($n($$0){4$0}) ($n($$0)))
+
+        # 0 = rep O byte, 1 = func
+        &&with_O (
+            $move_ft ($$0($$0)) ($n($$0)$0)
+            $1
+            $move_ft ($n($$0)$0) ($$0($$0))
+        )
+    )
+
+    # reset 1
+    $n(>) >3 - <3 $n(<)
+    @$
+)
+
+&&add_1_to_4 (
+    # |0  |1  |2  |3  |4   |5   |6  |7  |8    |
+    # |O0 |O1 |O2 |O3 |src |dest|0  |1  |carry|
+    $add_1_n_core ({4$0}) (
+        $0
+        $with_O ({0$0}) ($add)
+        $load_carry
+        $with_O ({1$0}) ($add)
+        $load_carry
+        $with_O ({2$0}) ($add)
+        $load_carry
+        $with_O ({3$0}) ($add_no_carry)
+    )
+)
+
+&&increment_4 (
+    >4 + <4
+    $add_1_to_4
+)
+
+&&add_1_to_8 (
+    # |0  |1  |2  |3  |4  |5  |6  |7  |8   |9   |10 |11 |12   |
+    # |O0 |O1 |O2 |O3 |O4 |O5 |O6 |O7 |src |dest|0  |1  |carry|
+    $add_1_n_core ({8$0}) (
+        $0
+        $with_O ({0$0}) ($add)
+        $load_carry
+        $with_O ({1$0}) ($add)
+        $load_carry
+        $with_O ({2$0}) ($add)
+        $load_carry
+        $with_O ({3$0}) ($add)
+        $load_carry
+        $with_O ({4$0}) ($add)
+        $load_carry
+        $with_O ({5$0}) ($add)
+        $load_carry
+        $with_O ({6$0}) ($add)
+        $load_carry
+        $with_O ({7$0}) ($add_no_carry)
+    )
+)
+
+&&increment_8 (
+    >8 + <8
+    $add_1_to_8
+)
+
+# A += B for unsigned 4 byte A and B, B is consumed
+&&add_4 (
+    # |0  |1  |2  |3  |4  |5  |6  |7  |8   |9   |10 |11 |12   |
+    # |A0 |A1 |A2 |A3 |B0 |B1 |B2 |B3 |src |dest|0  |1  |carry|
+    $add_1_n_core ({8$0}) (
+        $0
+        # per byte: add the carry in src, then the B byte
+        $with_O ({0$0}) ($move_ft ({4$0}) ({8$0}) $add)
+        $load_carry
+        $with_O ({1$0}) ($add $move_ft ({5$0}) ({8$0}) $add)
+        $load_carry
+        $with_O ({2$0}) ($add $move_ft ({6$0}) ({8$0}) $add)
+        $load_carry
+        $with_O ({3$0}) ($add_no_carry $move_ft ({7$0}) ({8$0}) $add_no_carry)
+    )
+)
+
+# out = 1 if A < B else 0, for unsigned 4 byte A and B; both are consumed
+&&compare_4 (
+    # |0  |1  |2  |3  |4  |5  |6  |7  |8  |9  |10 |11 |12 |13 |
+    # |A0 |A1 |A2 |A3 |B0 |B1 |B2 |B3 |out|x  |0  |1  |f  |y  |
+
+    # set 1 cell
+    >11 + <11
+
+    # y times: if x is zero do $0 at out, then x -= 1
+    # 0 = action at out
+    &sub_wrap (
+        >13
+        [
+            -
+            <4
+            # f = 1 if x is zero
+            >3 + <3
+            [>3 - <2]
+            > [<] <
+            >3 [- <4 $0 >4] <3
+            -
+            >4
+        ]
+        <13
+        @$
+    )
+
+    # per byte: wrap -2w, nonzero +w
+    # 0 = rep byte, 1 = rep w
+    &cmp_byte (
+        $move_ft ($$0($$0)) ({9$0})
+        $move_ft ({4$0} $$0($$0)) ({13$0})
+        $sub_wrap ($$1(--))
+        >9 [[-] < $1(+) >] <9
+        @$
+    )
+    $cmp_byte ({0$0}) ({1$0})
+    $cmp_byte ({1$0}) ({2$0})
+    $cmp_byte ({2$0}) ({4$0})
+    $cmp_byte ({3$0}) ({8$0})
+
+    # out is -15 to 15: out + 15 wraps when subtracting 15 iff out < 0
+    >8 +15 <8
+    $move_ft ({8$0}) ({9$0})
+    >13 +15 <13
+    $sub_wrap (+)
+    >9 [-] <9
+
+    # reset 1 cell
+    >11 - <11
+    @$
+)
+
+# x mod n, consumes x, keeps n
+&&mod (
+    # |0  |1  |2  |3  |4
+    # |x  |n  |out|t  |0
+
+    [
+        - >> +
+        # n to out, t
+        < [->->+<<]
+        > 
+        [
+            > [-<+<+>>]
+        ]
+        >[>] @$4
+        <[-<<+>>]
+        <3 @$
+    ]
+    @$
+)

@@ -1,0 +1,244 @@
+$import("utils.bfpp")
+
+&&create_func_caller
+(
+    @0
+    >128
+    # reference @128..192 as arguments
+    {9
+        *
+        $move_8
+            (<128 >17)
+            (<17 >128)
+
+        >8
+    }
+    # reference @200 as return
+    *
+    $move_8
+        (<200 >9)
+        (<9   >200)
+
+    <200
+    @0
+)
+
+# functions stored from -32 and below
+
+# 0 = rep ptr index, 1 = func name
+&find_function (@0
+    [>] > $1
+    <<[<]>
+    @0
+    %*
+    [>]>[>]>
+
+    $move_8(
+        <<[<]<[<]> @0
+        <32
+        $$0(<8)
+    )(
+        >32
+        $$0(>8)
+        [>]>[>]>
+    )
+
+    <<[[-]<]<[<]> @0
+)
+
+# 0 = caller id, 1 = ret type, 2 = arg types
+&create_caller (
+    @0
+    +$0>$1>$2
+    <[<]>
+    %&
+    [>]
+    < [[-]<] >
+    @0
+)
+
+&set_dll (
+    @0
+    $0
+)
+&clear_dll (
+    @0
+    [>]
+    <[[-]<]
+    >
+    @0
+)
+
+# 0 = rep ptr index, 1 = add caller index
+&call_function (
+    @0
+    # move function ptr from storage into 1..
+    <32 $0(<8)
+    $move_8(
+        $$0(>8) >33
+    )(
+        <33 $$0(<8)
+    )
+    $0(>8)>32
+    @0
+    # call with extern index
+    +$1 %$ [-]
+    # return function ptr to storage
+    >
+    $move_8
+        (<33 $$0(<8))
+        ($$0(>8) >33)
+    <
+    @0
+)
+
+# writes a ref to a cell into an arg, keeping the cell's contents
+# 0 = to cell, 1 = from cell, 2 = rep arg
+&&arg_ptr (
+    @0
+    # store cells in @104
+    $0 $move_8 ($$1 >104) (<104 $$0) $1
+    # reference
+    $0 * $move_8 ($$1 $$2(>)) ($$2(<) $$0) $1
+    # restore cells
+    >104 $move_8 (<104 $$0) ($$1 >104) <104
+    @0
+)
+
+# clears args and return
+&&clear_call (
+    @0
+    >128 $clear({80$0}) <128
+    @0
+)
+
+# fails unless @200 is zero
+# 0 = message
+&&check_zero (
+    @0
+    >201
+    [[-] < [-]+ >] >
+    [[-] <2 [-]+ >2] >
+    [[-] <3 [-]+ >3]
+    <3
+    [ >8 $fail ($$0) ]
+    <200
+    @0
+)
+
+# fails if @200 is zero
+# 0 = message
+&&check_nonzero (
+    @0
+    >200
+    $if_zero ($fail ($$$0))
+    <200
+    @0
+)
+
+&u16   (+4)
+&u32   (+6)
+&int   (+7)
+&u64   (+8)
+&ptr   (+12)
+&usize (+19)
+
+&&setup_functions (
+    $create_caller (+0)  ($int)   ()
+    $create_caller (+1)  ($int)   ($u16>$ptr)
+    $create_caller (+2)  ($usize) ($int>$int>$int)
+    $create_caller (+3)  ($int)   ($usize>$ptr>$int)
+    $create_caller (+4)  ($int)   ($usize>$ptr>$int>$int)
+    $create_caller (+5)  ($int)   ($usize)
+    $create_caller (+6)  ($u32)   ($u32)
+    $create_caller (+7)  ($int)   ($ptr>$ptr>$ptr>$u32)
+    $create_caller (+8)  ($int)   ($ptr>$u32)
+    $create_caller (+9)  ($int)   ($ptr>$ptr>$u32>$ptr>$u32>$ptr>$u32)
+    $create_caller (+10) ($int)   ($ptr>$ptr>$u32>$ptr>$u32>$u64>$ptr>$u32>$u32)
+    $create_caller (+11) ($int)   ($ptr>$ptr>$u32>$u32)
+    $create_caller (+12) ($int)   ($ptr>$u32>$u32>$ptr>$ptr)
+    $create_caller (+13) ($int)   ($ptr>$u32>$u32>$ptr>$ptr>$ptr>$ptr)
+    # variadic
+    $create_caller (+14) ($int)   ($ptr>$ptr>$ptr>$ptr>$ptr>$ptr>$ptr>$ptr)
+    $create_caller (+15) ($usize) ($ptr)
+    $create_caller (+16) ($int)   ($ptr>$ptr>$usize)
+    $create_caller (+17) ($ptr)   ($ptr>$int>$usize)
+
+    $set_dll (+"ws2_32")
+
+    $find_function ({0$0}) (+"WSAStartup")
+    $find_function ({1$0}) (+"WSACleanup")
+    $find_function ({2$0}) (+"WSAGetLastError")
+    $find_function ({3$0}) (+"socket")
+    $find_function ({4$0}) (+"connect")
+    $find_function ({5$0}) (+"send")
+    $find_function ({6$0}) (+"recv")
+    $find_function ({7$0}) (+"closesocket")
+    $find_function ({8$0}) (+"htonl")
+
+    $clear_dll
+
+    $set_dll (+"bcrypt")
+
+    $find_function ({16$0}) (+"BCryptOpenAlgorithmProvider")
+    $find_function ({17$0}) (+"BCryptCloseAlgorithmProvider")
+    $find_function ({18$0}) (+"BCryptHash")
+    $find_function ({19$0}) (+"BCryptDeriveKeyPBKDF2")
+    $find_function ({20$0}) (+"BCryptGenRandom")
+
+    $clear_dll
+
+    $set_dll (+"crypt32")
+
+    $find_function ({24$0}) (+"CryptBinaryToStringA")
+    $find_function ({25$0}) (+"CryptStringToBinaryA")
+
+    $clear_dll
+
+    $set_dll (+"msvcrt")
+
+    $find_function ({32$0}) (+"sprintf")
+    $find_function ({33$0}) (+"sscanf")
+    $find_function ({34$0}) (+"strlen")
+    $find_function ({35$0}) (+"strncmp")
+    $find_function ({36$0}) (+"memset")
+
+    $clear_dll
+)
+
+&&WSAStartup        ($call_function({0$0})(+1))
+&&WSACleanup        ($call_function({1$0})(+0))
+&&WSAGetLastError   ($call_function({2$0})(+0))
+&&socket            ($call_function({3$0})(+2))
+&&connect           ($call_function({4$0})(+3))
+&&send              ($call_function({5$0})(+4))
+&&recv              ($call_function({6$0})(+4))
+&&closesocket       ($call_function({7$0})(+5))
+&&htonl             ($call_function({8$0})(+6))
+
+&&BCryptOpenAlgorithmProvider   ($call_function({16$0})(+7))
+&&BCryptCloseAlgorithmProvider  ($call_function({17$0})(+8))
+&&BCryptHash                    ($call_function({18$0})(+9))
+&&BCryptDeriveKeyPBKDF2         ($call_function({19$0})(+10))
+&&BCryptGenRandom               ($call_function({20$0})(+11))
+
+&&CryptBinaryToStringA  ($call_function({24$0})(+12))
+&&CryptStringToBinaryA  ($call_function({25$0})(+13))
+
+&&sprintf   ($call_function({32$0})(+14))
+&&sscanf    ($call_function({33$0})(+14))
+&&strlen    ($call_function({34$0})(+15))
+&&strncmp   ($call_function({35$0})(+16))
+&&memset    ($call_function({36$0})(+17))
+
+&&AF_INET      (+2)
+&&SOCK_STREAM  (+1)
+&&IPPROTO_TCP  (+6)
+&&MSG_PEEK     (+2)
+&&MSG_WAITALL  (+8)
+
+&&BCRYPT_ALG_HANDLE_HMAC_FLAG       (+8)
+&&BCRYPT_USE_SYSTEM_PREFERRED_RNG   (+2)
+
+&&CRYPT_STRING_BASE64           (+1)
+&&CRYPT_STRING_BASE64_NOCRLF    (+1 >3 +64 <3)

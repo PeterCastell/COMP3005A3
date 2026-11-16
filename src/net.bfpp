@@ -1,0 +1,140 @@
+$import("utils.bfpp")
+$import("functions.bfpp")
+
+# socket stored at -24
+
+&&net_startup (
+    @0
+
+    >128 +2 > +2 <  # version 2.2
+    <128
+
+    # reference @512 as WSADATA
+    >512 * <512
+    $move_8_ft ({512$0}) ({136$0})
+
+    $WSAStartup
+
+    # clear args
+    >128 $clear({16$0}) <128
+    >512 $clear({408$0}) <512
+
+    # check result
+    >200
+    [ >8 $fail (+"WSAStartup failed") ]
+    <200
+
+    @0
+)
+
+&&net_cleanup (
+    @0
+
+    $WSACleanup
+    >200 $clear_8 <200
+
+    @0
+)
+
+&load_socket (
+    @0
+    <24
+    $move_8 (>24 >128) (<128 <24)
+    >24
+)
+&store_socket (
+    @0
+    >128
+    $move_8 (<128 <24) (>24 >128)
+    <128
+)
+
+# 0 = address bytes, 1 = port bytes
+&&net_connect (
+    @0
+
+    ## create socket
+    >128 $AF_INET <128
+    >136 $SOCK_STREAM <136
+    >144 $IPPROTO_TCP <144
+    $socket
+    >128 $clear({24$0}) <128
+
+    # check result
+    >207
+    [ > $fail (+"could not create a socket") ]
+    <207
+
+    $move_8_ft ({200$0}) ({128$0})
+
+    ## connect
+
+    # reference @256 as sockaddr
+    $arg_ptr (>256) (<256) ({136$0})
+    >256 $AF_INET >2 $1 >2 $0 <4 <256
+    >144 +16 <144
+    $connect
+    >256 $clear_8 <256
+    >136 $clear({16$0}) <136
+
+    $store_socket
+
+    # check result
+    >200
+    [ >8 $fail (+"could not connect to the database server") ]
+    <200
+
+    @0
+)
+
+# requires length in @144
+# 0 = to buffer, 1 = from buffer
+&&net_send (
+    @0
+
+    $load_socket
+    $arg_ptr ($$0) ($$1) ({136$0})
+    $send
+    >136 $clear_8 <136
+    $store_socket
+
+    # check result
+    >203
+    [ >5 $fail (+"could not send to the database server") ]
+    <203
+    >200 $clear_4 <200
+
+    @0
+)
+
+# requires length in @144, leaves received length in @200
+# 0 = to buffer, 1 = from buffer, 2 = flags
+&&net_recv (
+    @0
+
+    $load_socket
+    $arg_ptr ($$0) ($$1) ({136$0})
+    >152 $2 <152
+    $recv
+    >136 $clear_8 <136
+    >152 [-] <152
+    $store_socket
+
+    # check result
+    >203
+    [ >5 $fail (+"could not receive from the database server") ]
+    <203
+
+    @0
+)
+
+&&net_close (
+    @0
+
+    $load_socket
+    $closesocket
+    >128 $clear_8 <128
+    >200 $clear_8 <200
+
+    @0
+)

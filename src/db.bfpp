@@ -1,0 +1,655 @@
+$import("utils.bfpp")
+$import("functions.bfpp")
+$import("net.bfpp")
+
+# clears message type and payload
+&db_clear_message (
+    @0
+    >4088 * $move_8 (<4088 >128) (<128 >4088) <4088
+    >146 + <146
+    $memset
+    $clear_call
+    @0
+)
+
+# requires payload length in @4064
+# 0 = to first byte, 1 = from first byte, 2 = add type size to @144
+&db_send_core (
+    @0
+
+    # length = payload length + 4
+    >4068 +4 <4068
+    >4064 $add_1_to_4 <4064
+    >4064 $move_4 (<4064 >128) (<128 >4064) <4064
+    $htonl
+    >200 $move_4 (<200 >4092) (<4092 >200) <200
+
+    # send size
+    >128 $move_4 (>16) (<16) <128
+    $2
+    $net_send ($$0) ($$1)
+    >144 $clear_4 <144
+
+    $db_clear_message
+    @0
+)
+
+# requires payload length in @4064
+# 0 = message type
+&&db_send (
+    @0
+    >4091 $0 <4091
+    $db_send_core (>4091) (<4091) (>148 + <148 >144 $add_1_to_4 <144)
+    @0
+)
+
+# leaves message type in @4088 and payload in @4096
+&&db_recv (
+    @0
+    $db_clear_message
+
+    ## peek
+    # a fatal error must be read at once, as the server
+    # then closes the connection and the message is lost
+    >144 +96 > +234 < <144
+    $net_recv (>4091) (<4091) ($MSG_PEEK)
+    >144 $clear_4 <144
+    >200 $clear_4 <200
+    >4091 [- <3 + >3] <4091
+    >4092 $clear_4 <4092
+    >4088 -'E' $if_zero ($db_server_error) [-] <4088
+    $db_clear_message
+
+    ## header
+    >144 +5 <144
+    $net_recv (>4080) (<4080) ($MSG_WAITALL)
+    >144 -5 <144
+    >200 -5
+    [ >8 $fail (+"the database server closed the connection") ]
+    <200
+
+    # message type
+    >4080 [- >8 + <8] <4080
+
+    # payload length = length - 4
+    >4081 $move_4 (<4081 >128) (<128 >4081) <4081
+    $htonl
+    >128 $clear_4 <128
+    >200 $move_4 (<200 >512) (<512 >200) <200
+    >516 +252 > +255 > +255 > +255 <3 <516
+    >512 $add_4 <512
+
+    # move to arg, set @520 if non-zero
+    >512
+    [- <368 + >376 [-]+ <8] >
+    [- <368 + >375 [-]+ <7] >
+    [- <368 + >374 [-]+ <6] >
+    [- <368 + >373 [-]+ <5]
+    <3 <512
+
+    ## payload
+    >520
+    [ -
+        <520
+        $net_recv (>4096) (<4096) ($MSG_WAITALL)
+        >200 $clear_4 <200
+        >520
+    ]
+    <520
+    >144 $clear_4 <144
+
+    # check for error
+    >4088 -'E' $if_zero ($db_server_error) +'E' <4088
+    @0
+)
+
+# prints the error message and exits
+&db_server_error (
+    <3880 >
+    +"database error: " [.>]
+    <[[-]<]
+    >3880
+
+    # find message field
+    >8
+    [
+        -'M'
+        <+>
+        [ <-> [-] ]
+        <
+        [ - >> [.>] <[<] < ]
+        # next field
+        >> [>] >
+    ]
+    $println
+    + [ $! ]
+)
+
+&&db_wait_ready (
+    @0
+    # loop bit
+    >4086 +
+    [ -
+        <4086
+        $db_recv
+        >4088 -'Z' [ [-] <2 + >2 ]
+        <2
+    ]
+    <4086
+    @0
+)
+
+# requires user in @1024 and database in @1280
+&db_send_startup (
+    @0
+    # protocol version 3.0
+    >4097 +3 <4097
+
+    # parameters
+    $arg_ptr (>4100) (<4100) ({128$0})
+    $arg_ptr (>256) (<256) ({136$0})
+    >256 +"user%c%s%cdatabase%c%s%c" <256
+    $arg_ptr (>1024) (<1024) ({152$0})
+    $arg_ptr (>1280) (<1280) ({176$0})
+    $sprintf
+    >256 $clear_nt <256
+
+    # payload length = version + parameters + terminator
+    >200 $move_4 (<200 >4064) (<4064 >200) <200
+    $clear_call
+    >4068 +5 <4068
+    >4064 $add_1_to_4 <4064
+
+    $db_send_core (>4092) (<4092) ()
+    @0
+)
+
+# 0 = rep auth code
+&db_expect_auth (
+    @0
+    >4088 -'R'
+    [ <3880 $fail (+"expected an authentication message from the server") ]
+    +'R' <4088
+    >4099 $0(-)
+    [ <3891 $fail (+"unexpected authentication step from the server") ]
+    $0(+) <4099
+    @0
+)
+
+&db_authenticate (
+    @0
+    $db_recv
+    >4088 -'R'
+    [ <3880 $fail (+"unexpected reply to the startup message") ]
+    +'R' <4088
+
+    # skip scram if AuthenticationOk
+    >4099
+    [ <4099 $db_scram >4099 [-] ]
+    <4099
+
+    # clear strings and scram data
+    >1024 * $move_8 (<1024 >128) (<128 >1024) <1024
+    >144 +224 > +11 < <144
+    $memset
+    $clear_call
+    @0
+)
+
+&load_hmac (
+    @0
+    >2520 $move_8 (<2520 >128) (<128 >2520) <2520
+)
+&store_hmac (
+    @0
+    >128 $move_8 (<128 >2520) (<2520 >128) <128
+)
+&load_sha (
+    @0
+    >2528 $move_8 (<2528 >128) (<128 >2528) <2528
+)
+&store_sha (
+    @0
+    >128 $move_8 (<128 >2528) (<2528 >128) <128
+)
+
+# requires input length in @160
+# 0 = to key, 1 = from key, 2 = to input, 3 = from input, 4 = to output, 5 = from output
+&hmac (
+    @0
+    $load_hmac
+    $arg_ptr ($$0) ($$1) ({136$0})
+    >144 +32 <144
+    $arg_ptr ($$2) ($$3) ({152$0})
+    $arg_ptr ($$4) ($$5) ({168$0})
+    >176 +32 <176
+    $BCryptHash
+    $store_hmac
+    $check_zero (+"could not compute an HMAC")
+    $clear_call
+    @0
+)
+
+# leaves auth message length in @160
+&auth_message_length (
+    @0
+    $arg_ptr (>3072) (<3072) ({128$0})
+    $strlen
+    >128 $clear_8 <128
+    >200 $move_4 (<40) (>40) <200
+    @0
+)
+
+# 0 = to bytes, 1 = from bytes, 2 = add byte count, 3 = to string, 4 = from string
+&base64_encode (
+    @0
+    $arg_ptr ($$0) ($$1) ({128$0})
+    >136 $2 <136
+    >144 $CRYPT_STRING_BASE64_NOCRLF <144
+    $arg_ptr ($$3) ($$4) ({152$0})
+    # string size
+    $arg_ptr (>2536) (<2536) ({160$0})
+    >2536 +64 <2536
+    $CryptBinaryToStringA
+    $check_nonzero (+"could not base64 encode")
+    $clear_call
+    >2536 $clear_4 <2536
+    @0
+)
+
+&db_scram (
+    @0
+    # check for AuthenticationSASL
+    >4099 -10
+    [ <3891 $fail (+"the server asked for an authentication method other than SCRAM-SHA-256") ]
+    <4099
+
+    ## client nonce
+
+    $arg_ptr (>2112) (<2112) ({136$0})
+    >144 +18 <144
+    >152 $BCRYPT_USE_SYSTEM_PREFERRED_RNG <152
+    $BCryptGenRandom
+    $check_zero (+"could not generate a nonce")
+    $clear_call
+
+    $base64_encode (>2112) (<2112) (+18) (>2053) (<2053)
+    >2112 $clear({18$0}) <2112
+    >2048 +"n=,r=" <2048
+
+    ## send SASLInitialResponse
+
+    $db_clear_message
+    >4096 +"SCRAM-SHA-256" <4096
+    >4113 +32 <4113
+    $arg_ptr (>4114) (<4114) ({128$0})
+    $arg_ptr (>256) (<256) ({136$0})
+    >256 +"n,,%s" <256
+    $arg_ptr (>2048) (<2048) ({144$0})
+    $sprintf
+    >256 $clear_nt <256
+    $clear_call
+    # payload length = name + length + message
+    >4064 +50 <4064
+    $db_send (+'p')
+
+    ## read server-first-message
+
+    $db_recv
+    $db_expect_auth ({11$0})
+
+    # nonce, salt, iterations
+    $arg_ptr (>4100) (<4100) ({128$0})
+    $arg_ptr (>256) (<256) ({136$0})
+    >256 +"r=%127[^,],s=%127[^,],i=%d" <256
+    $arg_ptr (>2176) (<2176) ({144$0})
+    $arg_ptr (>2304) (<2304) ({152$0})
+    $arg_ptr (>2504) (<2504) ({160$0})
+    $sscanf
+    >256 $clear_nt <256
+    # check result
+    >200 -3
+    [ >8 $fail (+"could not read the SCRAM challenge from the server") ]
+    <200
+    $clear_call
+
+    # check nonce starts with client nonce
+    $arg_ptr (>2176) (<2176) ({128$0})
+    $arg_ptr (>2053) (<2053) ({136$0})
+    >144 +24 <144
+    $strncmp
+    $check_zero (+"the server replied with a different nonce")
+    $clear_call
+
+    ## auth message
+
+    $arg_ptr (>3072) (<3072) ({128$0})
+    $arg_ptr (>256) (<256) ({136$0})
+    >256 +"%s,%.512s,c=biws,r=%s" <256
+    $arg_ptr (>2048) (<2048) ({144$0})
+    $arg_ptr (>4100) (<4100) ({152$0})
+    $arg_ptr (>2176) (<2176) ({160$0})
+    $sprintf
+    >256 $clear_nt <256
+    $clear_call
+
+    ## decode salt
+
+    $arg_ptr (>2304) (<2304) ({128$0})
+    >144 $CRYPT_STRING_BASE64 <144
+    $arg_ptr (>2432) (<2432) ({152$0})
+    # buffer size
+    $arg_ptr (>2496) (<2496) ({160$0})
+    >2496 +64 <2496
+    $CryptStringToBinaryA
+    $check_nonzero (+"could not decode the salt from the server")
+    $clear_call
+
+    ## open algorithms
+
+    $arg_ptr (>2520) (<2520) ({128$0})
+    $arg_ptr (>256) (<256) ({136$0})
+    # wide string
+    >256 +'S' >2 +'H' >2 +'A' >2 +'2' >2 +'5' >2 +'6' <10 <256
+    >152 $BCRYPT_ALG_HANDLE_HMAC_FLAG <152
+    $BCryptOpenAlgorithmProvider
+    $check_zero (+"could not open the HMAC-SHA-256 algorithm")
+    $clear_call
+
+    $arg_ptr (>2528) (<2528) ({128$0})
+    $arg_ptr (>256) (<256) ({136$0})
+    $BCryptOpenAlgorithmProvider
+    $check_zero (+"could not open the SHA-256 algorithm")
+    $clear_call
+    >256 $clear({12$0}) <256
+
+    ## salted password
+
+    # password length
+    $arg_ptr (>1536) (<1536) ({128$0})
+    $strlen
+    >128 $clear_8 <128
+    >200 $move_4 (<56) (>56) <200
+
+    $load_hmac
+    $arg_ptr (>1536) (<1536) ({136$0})
+    $arg_ptr (>2432) (<2432) ({152$0})
+    >2496 $move_4 (<2496 >160) (<160 >2496) <2496
+    >2504 $move_4 (<2504 >168) (<168 >2504) <2504
+    $arg_ptr (>2560) (<2560) ({176$0})
+    >184 +32 <184
+    $BCryptDeriveKeyPBKDF2
+    $store_hmac
+    $check_zero (+"could not derive the salted password")
+    $clear_call
+
+    ## client key
+
+    >256 +"Client Key" <256
+    >160 +10 <160
+    $hmac (>2560) (<2560) (>256) (<256) (>2592) (<2592)
+    >256 $clear_nt <256
+
+    ## stored key
+
+    $load_sha
+    $arg_ptr (>2592) (<2592) ({152$0})
+    >160 +32 <160
+    $arg_ptr (>2752) (<2752) ({168$0})
+    >176 +32 <176
+    $BCryptHash
+    $store_sha
+    $check_zero (+"could not hash the client key")
+    $clear_call
+
+    ## client signature
+
+    $auth_message_length
+    $hmac (>2752) (<2752) (>3072) (<3072) (>2624) (<2624)
+
+    ## client proof = client key xor client signature
+
+    # |+0 |+32      |+64  |+96     |
+    # |key|signature|proof|xor work|
+    >2592
+    {32
+        [- >96 + <96]
+        >32 [- >65 + <65] <32
+        >96 $xor <96
+        >98 [- <34 + >34] <98
+        >
+    }
+    <32 <2592
+
+    ## server key
+
+    >256 +"Server Key" <256
+    >160 +10 <160
+    $hmac (>2560) (<2560) (>256) (<256) (>2784) (<2784)
+    >256 $clear_nt <256
+
+    ## server signature
+
+    $auth_message_length
+    $hmac (>2784) (<2784) (>3072) (<3072) (>2816) (<2816)
+
+    ## send SASLResponse
+
+    $base64_encode (>2656) (<2656) (+32) (>2848) (<2848)
+
+    $db_clear_message
+    $arg_ptr (>4096) (<4096) ({128$0})
+    $arg_ptr (>256) (<256) ({136$0})
+    >256 +"c=biws,r=%s,p=%s" <256
+    $arg_ptr (>2176) (<2176) ({144$0})
+    $arg_ptr (>2848) (<2848) ({152$0})
+    $sprintf
+    >256 $clear_nt <256
+    # payload length
+    >200 $move_4 (<200 >4064) (<4064 >200) <200
+    $clear_call
+    $db_send (+'p')
+
+    ## check server signature
+
+    $db_recv
+    $db_expect_auth ({12$0})
+
+    $base64_encode (>2816) (<2816) (+32) (>2912) (<2912)
+    $arg_ptr (>4102) (<4102) ({128$0})
+    $arg_ptr (>2912) (<2912) ({136$0})
+    >144 +44 <144
+    $strncmp
+    $check_zero (+"the server could not prove that it knows the password")
+    $clear_call
+
+    ## AuthenticationOk
+
+    $db_recv
+    $db_expect_auth ({0$0})
+
+    ## close algorithms
+
+    $load_hmac
+    $BCryptCloseAlgorithmProvider
+    $clear_call
+    $load_sha
+    $BCryptCloseAlgorithmProvider
+    $clear_call
+    @0
+)
+
+# 0 = address bytes, 1 = port bytes, 2 = user, 3 = database, 4 = password
+&&db_connect (
+    @0
+    >1024 $2 <1024
+    >1280 $3 <1280
+    >1536 $4 <1536
+    $net_connect ($$0) ($$1)
+    $db_send_startup
+    $db_authenticate
+    $db_wait_ready
+    @0
+)
+
+# requires query string in @4096
+&&db_query (
+    @0
+    # payload length
+    $arg_ptr (>4096) (<4096) ({128$0})
+    $strlen
+    >128 $clear_8 <128
+    >200 $move_4 (<200 >4064) (<4064 >200) <200
+    >4068 + <4068
+    >4064 $add_1_to_4 <4064
+    $db_send (+'Q')
+
+    # loop bit
+    >4086 +
+    [ -
+        <4086
+        $db_recv
+        >4088
+        # RowDescription
+        -'T' $if_zero (<4088 $db_print_columns >4088 $println) +'T'
+        # DataRow
+        -'D' $if_zero (<4088 $db_print_row >4088 $println) +'D'
+        # CommandComplete
+        -'C' $if_zero (>8 [.>] <[<] <7 $println) +'C'
+        # ReadyForQuery
+        -'Z' [ [-] <2 + >2 ]
+        <2
+    ]
+    <4086
+    @0
+)
+
+# 0 = query template, 1..4 = values
+&&run_query_4 (
+    @0
+    >1024 $1 <1024
+    >1280 $2 <1280
+    >1536 $3 <1536
+    >1792 $4 <1792
+
+    # format template into query
+    $arg_ptr (>4096) (<4096) ({128$0})
+    $arg_ptr (>256) (<256) ({136$0})
+    >256 $0 <256
+    $arg_ptr (>1024) (<1024) ({144$0})
+    $arg_ptr (>1280) (<1280) ({152$0})
+    $arg_ptr (>1536) (<1536) ({160$0})
+    $arg_ptr (>1792) (<1792) ({168$0})
+    $sprintf
+    $clear_call
+
+    >256 $clear_nt <256
+    >1024 $clear_nt <1024
+    >1280 $clear_nt <1280
+    >1536 $clear_nt <1536
+    >1792 $clear_nt <1792
+
+    $db_query
+    @0
+)
+
+# payload ptr stored at 768
+
+# prints string at ptr
+&print_at_ptr (
+    @0
+    >768 ~ >8
+    [ . [-] <8 $increment_8 ~ >8 ]
+    <8 <768
+    @0
+)
+
+# 0 = add distance
+&advance_ptr (
+    @0
+    >776 $0 <776
+    >768 $add_1_to_8 <768
+    @0
+)
+
+# 0 = print column and move ptr to next
+&db_each_column (
+    @0
+    # reference first column
+    $arg_ptr (>4098) (<4098) ({128$0})
+    >128 $move_8 (>640) (<640) <128
+    # column count
+    >4097 [- <3313 + >3313] <4097
+    >784
+    [ -
+        <784 $0 >784
+        # print separator if more columns
+        [
+            > +' ' . +92 . -92 . [-] <
+            [- >> + <<]
+        ]
+        >> [- << + >>] <<
+    ]
+    <784
+    >768 $clear_8 <768
+    @0
+)
+
+&db_print_columns (
+    @0
+    $db_each_column (
+        $print_at_ptr
+        $advance_ptr (+19)
+    )
+    @0
+)
+
+&db_print_row (
+    @0
+    $db_each_column (
+        # value length to @788..791
+        $read_ptr_byte (>12) (<12)
+        $read_ptr_byte (>13) (<13)
+        $read_ptr_byte (>14) (<14)
+        $read_ptr_byte (>15) (<15)
+
+        # NULL
+        >788
+        [
+            [-] > [-] > [-] > [-] <3
+            +'N' . +7 . -9 . . [-]
+        ]
+        <788
+
+        # print value
+        >791 [ - <791 $print_ptr_byte >791 ] <791
+        >790 [ - <790 {256 $print_ptr_byte } >790 ] <790
+        >789 [ - <789 {256 {256 $print_ptr_byte }} >789 ] <789
+    )
+    @0
+)
+
+# 0 = @776 to dest, 1 = dest to @776
+&read_ptr_byte (
+    @0
+    >768 ~ >8 [- $$0 + $$1] <8
+    $increment_8
+    <768
+    @0
+)
+
+&print_ptr_byte (
+    @0
+    >768 ~ >8 . [-] <8
+    $increment_8
+    <768
+    @0
+)
+
+&&db_disconnect (
+    @0
+    $db_clear_message
+    $db_send (+'X')
+    $net_close
+    @0
+)
