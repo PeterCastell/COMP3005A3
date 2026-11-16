@@ -4,12 +4,11 @@ A PostgreSQL client for a `students` table, written in
 [Brainfuck++](https://github.com/PeterCastell/BrainfuckPlusPlus).
 
 It uses no database driver. The program opens a TCP socket, logs in with
-SCRAM-SHA-256 and exchanges PostgreSQL protocol messages itself, calling only
-libraries that ship with Windows.
+SCRAM-SHA-256 and exchanges PostgreSQL protocol messages itself.
 
 ## Video
 
-VIDEO LINK GOES HERE
+<video src="https://github.com/PeterCastell/COMP3005A3/raw/refs/heads/master/BFPP%20Postgres%20Demo.mp4" controls></video>
 
 ## Requirements
 

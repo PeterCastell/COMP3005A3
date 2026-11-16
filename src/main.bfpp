@@ -46,13 +46,10 @@ $db_connect
 $getAllStudents
 
 $addStudent (+"Peter") (+"Castell") (+"peter@castell.org") (+"2023-09-03")
-$getAllStudents
 
 $updateStudentEmail (+"1") (+"john@example.com")
-$getAllStudents
 
 $deleteStudent (+"3")
-$getAllStudents
 
 $db_disconnect
 $net_cleanup
